@@ -26,12 +26,12 @@ import { useData } from '../contexts/DataContext';
 import PropertyMap from '../components/PropertyMap';
 
 const OwnedPropertiesPage = () => {
-  const { buildings, loading, error } = useData();
+  const { owned, loading, error } = useData();
 
   // Filter only owned properties
   const ownedProperties = useMemo(() => {
-    return buildings.filter(building => building.ownedOrLeased === 'F');
-  }, [buildings]);
+    return owned.filter(building => building.ownedOrLeased === 'F');
+  }, [owned]);
 
   // Prepare data for construction date chart
   const constructionDateData = useMemo(() => {
@@ -211,7 +211,7 @@ const OwnedPropertiesPage = () => {
         <Grid item xs={12} lg={6}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Buildings by Construction Date (Decades)
+              owned by Construction Date (Decades)
             </Typography>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={constructionDateData}>

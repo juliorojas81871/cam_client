@@ -11,7 +11,7 @@ export const useData = () => {
 };
 
 export const DataProvider = ({ children }) => {
-  const [buildings, setBuildings] = useState([]);
+  const [owned, setOwned] = useState([]);
   const [leases, setLeases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,19 +21,19 @@ export const DataProvider = ({ children }) => {
       setLoading(true);
       setError(null);
 
-      const [buildingsResponse, leasesResponse] = await Promise.all([
-        fetch('http://localhost:3001/api/buildings'),
+      const [ownedResponse, leasesResponse] = await Promise.all([
+        fetch('http://localhost:3001/api/owned'),
         fetch('http://localhost:3001/api/leases')
       ]);
 
-      if (!buildingsResponse.ok || !leasesResponse.ok) {
+      if (!ownedResponse.ok || !leasesResponse.ok) {
         throw new Error('Failed to fetch data from server');
       }
 
-      const buildingsData = await buildingsResponse.json();
+      const ownedData = await ownedResponse.json();
       const leasesData = await leasesResponse.json();
 
-      setBuildings(buildingsData.data || []);
+      setOwned(ownedData.data || []);
       setLeases(leasesData.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while fetching data');
@@ -47,7 +47,7 @@ export const DataProvider = ({ children }) => {
   }, []);
 
   const value = {
-    buildings,
+    owned,
     leases,
     loading,
     error,

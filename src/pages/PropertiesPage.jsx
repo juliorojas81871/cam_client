@@ -27,7 +27,7 @@ import { useData } from '../contexts/DataContext';
 const ITEMS_PER_PAGE = 100;
 
 const PropertiesPage = () => {
-  const { buildings, leases, loading, error } = useData();
+  const { owned, leases, loading, error } = useData();
   
   // Filtering states
   const [nameFilter, setNameFilter] = useState('');
@@ -45,8 +45,8 @@ const PropertiesPage = () => {
   const combinedProperties = useMemo(() => {
     const properties = [];
 
-    // Process buildings
-    buildings.forEach(building => {
+    // Process owned
+    owned.forEach(building => {
       properties.push({
         id: `building-${building.id}`,
         name: building.cleanedBuildingName || building.realPropertyAssetName,
@@ -70,7 +70,7 @@ const PropertiesPage = () => {
     });
 
     return properties;
-  }, [buildings, leases]);
+  }, [owned, leases]);
 
   // Filter and sort properties
   const filteredAndSortedProperties = useMemo(() => {
@@ -167,7 +167,7 @@ const PropertiesPage = () => {
       </Typography>
       
       <Typography variant="body1" color="text.secondary" gutterBottom>
-        View, filter, and sort all buildings and leased properties
+        View, filter, and sort all owned and leased properties
       </Typography>
 
       {/* Filters */}
