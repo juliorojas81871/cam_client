@@ -219,22 +219,15 @@ const MapComponent = ({ properties, center, zoom }) => {
 };
 
 const PropertyMap = ({ properties }) => {
-  // Calculate center point from properties
+  // Always center on USA for initial view
   const center = useMemo(() => {
-    if (properties.length === 0) {
-      return { lat: 39.8283, lng: -98.5795 }; // Center of USA
-    }
+    return { lat: 39.8283, lng: -98.5795 }; // Geographic center of USA
+  }, []);
 
-    const validProperties = properties.filter(p => p.latitude && p.longitude);
-    if (validProperties.length === 0) {
-      return { lat: 39.8283, lng: -98.5795 };
-    }
-
-    const avgLat = validProperties.reduce((sum, p) => sum + parseFloat(p.latitude), 0) / validProperties.length;
-    const avgLng = validProperties.reduce((sum, p) => sum + parseFloat(p.longitude), 0) / validProperties.length;
-
-    return { lat: avgLat, lng: avgLng };
-  }, [properties]);
+  // Calculate zoom level to show all of USA
+  const zoom = useMemo(() => {
+    return 4; // Zoom level 4 shows the entire continental United States
+  }, []);
 
   const render = (status) => {
     if (status === Status.LOADING) {
@@ -253,7 +246,7 @@ const PropertyMap = ({ properties }) => {
       );
     }
 
-    return <MapComponent properties={properties} center={center} zoom={6} />;
+    return <MapComponent properties={properties} center={center} zoom={zoom} />;
   };
 
   return (
