@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Container, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { DataProvider } from './contexts/DataContext';
@@ -25,7 +24,12 @@ const App = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <DataProvider>
-        <Router>
+        <Router
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <Navbar />
           <Container sx={{ mt: 4 }}>
             <Routes>
