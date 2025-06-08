@@ -6,6 +6,59 @@ const MapComponent = ({ properties, center, zoom }) => {
   const [map, setMap] = useState(null);
   const [infoWindow, setInfoWindow] = useState(null);
   const markersRef = useRef([]);
+  const hoverTimeoutRef = useRef(null);
+  const currentHoveredMarker = useRef(null);
+
+  // Helper functions for stable hover behavior
+  const showInfoWindow = useCallback((property, marker, position = null) => {
+    if (!infoWindow) return;
+    
+    // Clear any pending hide timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    
+    // Don't show if we're already showing this marker
+    if (currentHoveredMarker.current === marker) return;
+    
+    currentHoveredMarker.current = marker;
+    
+    infoWindow.setContent(`
+      <div style="padding: 8px; max-width: 250px;">
+        <h4 style="margin: 0 0 8px 0; color: #333;">${property.name}</h4>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Status:</strong> ${property.buildingStatus || 'Active'}</p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Type:</strong> ${property.realPropertyAssetType || 'Building'}</p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Address:</strong> ${property.address}</p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Congressional District Rep:</strong> ${property.congressionalDistrictRepresentativeName || 'N/A'}</p>
+        <p style="margin: 4px 0; font-size: 14px;"><strong>Construction Date:</strong> ${property.constructionDate || 'N/A'}</p>
+      </div>
+    `);
+    
+    if (position) {
+      infoWindow.setPosition(position);
+      infoWindow.open(map);
+    } else {
+      infoWindow.open({
+        anchor: marker,
+        map
+      });
+    }
+  }, [infoWindow, map]);
+  
+  const hideInfoWindow = useCallback(() => {
+    // Add a small delay before hiding to prevent flickering
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (infoWindow) {
+        infoWindow.close();
+        currentHoveredMarker.current = null;
+      }
+    }, 100); // 100ms delay
+  }, [infoWindow]);
 
   const mapRef = useCallback((node) => {
     if (node !== null && !map) {
@@ -15,12 +68,25 @@ const MapComponent = ({ properties, center, zoom }) => {
         mapTypeId: 'satellite',
       });
       setMap(newMap);
-
-      // Create info window
+  
+      // 🔧 Inject styles to fix InfoWindow behavior
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .gm-style .gm-style-iw {
+          pointer-events: none !important;
+        }
+        .gm-style .gm-ui-hover-effect {
+          display: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+  
       const newInfoWindow = new window.google.maps.InfoWindow();
       setInfoWindow(newInfoWindow);
     }
   }, [map, center, zoom]);
+  
+  
 
   useEffect(() => {
     if (map && properties.length > 0) {
@@ -81,30 +147,18 @@ const MapComponent = ({ properties, center, zoom }) => {
               content: markerContent,
             });
 
-            // Add hover events
-            markerContent.addEventListener('mouseover', () => {
-              if (infoWindow) {
-                infoWindow.setContent(`
-                  <div style="padding: 8px; max-width: 250px;">
-                    <h4 style="margin: 0 0 8px 0; color: #333;">${property.name}</h4>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Status:</strong> ${property.buildingStatus || 'Active'}</p>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Type:</strong> ${property.realPropertyAssetType || 'Building'}</p>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Address:</strong> ${property.address}</p>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Congressional District Rep:</strong> ${property.congressionalDistrictRepresentativeName || 'N/A'}</p>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Construction Date:</strong> ${property.constructionDate || 'N/A'}</p>
-                  </div>
-                `);
-                infoWindow.open({
-                  anchor: marker,
-                  map
-                });
-              }
+            // Add stable hover events
+            markerContent.addEventListener('mouseenter', () => {
+              showInfoWindow(property, marker);
             });
 
-            markerContent.addEventListener('mouseout', () => {
-              if (infoWindow) {
-                infoWindow.close();
-              }
+            markerContent.addEventListener('mouseleave', () => {
+              hideInfoWindow();
+            });
+            
+            // Also handle the info window hover to prevent closing when user hovers over it
+            markerContent.addEventListener('mouseover', (e) => {
+              e.stopPropagation();
             });
 
             return marker;
@@ -115,11 +169,13 @@ const MapComponent = ({ properties, center, zoom }) => {
 
         // If AdvancedMarkerElement is not available, create a custom overlay
         class CustomMarker extends window.google.maps.OverlayView {
-          constructor(position, map, property) {
+          constructor(position, map, property, showInfoCallback, hideInfoCallback) {
             super();
             this.position = position;
             this.property = property;
             this.div = null;
+            this.showInfoCallback = showInfoCallback;
+            this.hideInfoCallback = hideInfoCallback;
             this.setMap(map);
           }
 
@@ -151,28 +207,13 @@ const MapComponent = ({ properties, center, zoom }) => {
               </div>
             `;
 
-            // Add hover events
-            this.div.addEventListener('mouseover', () => {
-              if (infoWindow) {
-                infoWindow.setContent(`
-                  <div style="padding: 8px; max-width: 250px;">
-                    <h4 style="margin: 0 0 8px 0; color: #333;">${this.property.name}</h4>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Status:</strong> ${this.property.buildingStatus || 'Active'}</p>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Type:</strong> ${this.property.realPropertyAssetType || 'Building'}</p>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Address:</strong> ${this.property.address}</p>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Congressional District Rep:</strong> ${this.property.congressionalDistrictRepresentativeName || 'N/A'}</p>
-                    <p style="margin: 4px 0; font-size: 14px;"><strong>Construction Date:</strong> ${this.property.constructionDate || 'N/A'}</p>
-                  </div>
-                `);
-                infoWindow.setPosition(this.position);
-                infoWindow.open(map);
-              }
+            // Add stable hover events for custom overlay
+            this.div.addEventListener('mouseenter', () => {
+              this.showInfoCallback(this.property, this, this.position);
             });
 
-            this.div.addEventListener('mouseout', () => {
-              if (infoWindow) {
-                infoWindow.close();
-              }
+            this.div.addEventListener('mouseleave', () => {
+              this.hideInfoCallback();
             });
 
             const panes = this.getPanes();
@@ -197,7 +238,7 @@ const MapComponent = ({ properties, center, zoom }) => {
           }
         }
 
-        return new CustomMarker(position, map, property);
+        return new CustomMarker(position, map, property, showInfoWindow, hideInfoWindow);
       }).filter(Boolean);
 
       markersRef.current = newMarkers;
@@ -212,6 +253,11 @@ const MapComponent = ({ properties, center, zoom }) => {
           marker.map = null;
         }
       });
+      
+      // Clear any pending timeout
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
     };
   }, []);
 
