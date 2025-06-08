@@ -38,9 +38,6 @@ const MapComponent = ({ properties, center, zoom }) => {
         zoomControl: true,
       });
       setMap(newMap);
-
-      // Create Street View service
-      const streetViewService = new window.google.maps.StreetViewService();
       
       // Create info window
       const newInfoWindow = new window.google.maps.InfoWindow();
@@ -267,54 +264,117 @@ const MapComponent = ({ properties, center, zoom }) => {
           }
         }
 
-        // Fallback to standard markers if AdvancedMarkerElement is not available
-        const marker = new window.google.maps.Marker({
-          position,
-          map,
-          title: property.name,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 12,
-            fillColor: property.type === 'Owned' ? '#1976d2' : '#ff9800',
-            fillOpacity: 0.8,
-            strokeColor: 'white',
-            strokeWeight: 3,
+        // If AdvancedMarkerElement is not available, create a custom overlay
+        class CustomMarker extends window.google.maps.OverlayView {
+          constructor(position, map, property, openStreetViewCallback, infoWindow) {
+            super();
+            this.position = position;
+            this.property = property;
+            this.div = null;
+            this.openStreetViewCallback = openStreetViewCallback;
+            this.infoWindow = infoWindow;
+            this.setMap(map);
           }
-        });
 
-        // Add click event for Street View
-        marker.addListener('click', () => {
-          openStreetView(position, property);
-        });
-
-        // Add hover events
-        marker.addListener('mouseover', () => {
-          if (infoWindow) {
-            infoWindow.setContent(`
-              <div style="padding: 12px; max-width: 280px;">
-                <h4 style="margin: 0 0 8px 0; color: #333;">${property.name}</h4>
-                <p style="margin: 4px 0; font-size: 14px;"><strong>Type:</strong> 
-                  <span style="color: ${property.type === 'Owned' ? '#1976d2' : '#ff9800'}; font-weight: bold;">${property.type}</span>
-                </p>
-                <p style="margin: 4px 0; font-size: 14px;"><strong>Status:</strong> ${property.status}</p>
-                <p style="margin: 4px 0; font-size: 14px;"><strong>Address:</strong> ${property.address}</p>
-                ${property.constructionDate ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Built:</strong> ${property.constructionDate}</p>` : ''}
-                <div style="margin-top: 8px; padding: 4px 8px; background: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666;">
-                  Click marker to view in Street View
-                </div>
+          onAdd() {
+            this.div = document.createElement('div');
+            this.div.style.position = 'absolute';
+            this.div.style.cursor = 'pointer';
+            
+            const markerColor = this.property.type === 'Owned' ? '#1976d2' : '#ff9800';
+            this.div.innerHTML = `
+              <div style="
+                width: 24px; 
+                height: 24px; 
+                background: ${markerColor}; 
+                border: 3px solid white; 
+                border-radius: 50%; 
+                box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+                cursor: pointer;
+                position: relative;
+                transition: transform 0.2s ease;
+              ">
+                <div style="
+                  position: absolute;
+                  bottom: 100%;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  width: 0;
+                  height: 0;
+                  border-left: 8px solid transparent;
+                  border-right: 8px solid transparent;
+                  border-top: 10px solid ${markerColor};
+                "></div>
               </div>
-            `);
-            infoWindow.open(map, marker);
-          }
-        });
+            `;
 
-        marker.addListener('mouseout', () => {
-          if (infoWindow) {
-            infoWindow.close();
-          }
-        });
+            // Add hover effects
+            this.div.addEventListener('mouseenter', () => {
+              this.div.querySelector('div').style.transform = 'scale(1.2)';
+            });
+            
+            this.div.addEventListener('mouseleave', () => {
+              this.div.querySelector('div').style.transform = 'scale(1)';
+            });
 
-        return marker;
+            // Add click event for Street View
+            this.div.addEventListener('click', () => {
+              this.openStreetViewCallback(this.position, this.property);
+            });
+
+            // Add hover events for info window
+            this.div.addEventListener('mouseover', () => {
+              if (this.infoWindow) {
+                this.infoWindow.setContent(`
+                  <div style="padding: 12px; max-width: 280px;">
+                    <h4 style="margin: 0 0 8px 0; color: #333;">${this.property.name}</h4>
+                    <p style="margin: 4px 0; font-size: 14px;"><strong>Type:</strong> 
+                      <span style="color: ${this.property.type === 'Owned' ? '#1976d2' : '#ff9800'}; font-weight: bold;">${this.property.type}</span>
+                    </p>
+                    <p style="margin: 4px 0; font-size: 14px;"><strong>Status:</strong> ${this.property.status}</p>
+                    <p style="margin: 4px 0; font-size: 14px;"><strong>Address:</strong> ${this.property.address}</p>
+                    ${this.property.constructionDate ? `<p style="margin: 4px 0; font-size: 14px;"><strong>Built:</strong> ${this.property.constructionDate}</p>` : ''}
+                    <div style="margin-top: 8px; padding: 4px 8px; background: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666;">
+                      Click marker to view in Street View
+                    </div>
+                  </div>
+                `);
+                this.infoWindow.open({
+                  anchor: this,
+                  map: this.getMap()
+                });
+              }
+            });
+
+            this.div.addEventListener('mouseout', () => {
+              if (this.infoWindow) {
+                this.infoWindow.close();
+              }
+            });
+
+            const panes = this.getPanes();
+            panes.overlayMouseTarget.appendChild(this.div);
+          }
+
+          draw() {
+            const overlayProjection = this.getProjection();
+            const pos = overlayProjection.fromLatLngToDivPixel(this.position);
+            
+            if (pos && this.div) {
+              this.div.style.left = (pos.x - 15) + 'px';
+              this.div.style.top = (pos.y - 37) + 'px';
+            }
+          }
+
+          onRemove() {
+            if (this.div) {
+              this.div.parentNode.removeChild(this.div);
+              this.div = null;
+            }
+          }
+        }
+
+        return new CustomMarker(position, map, property, openStreetView, infoWindow);
       }).filter(Boolean);
 
       markersRef.current = newMarkers;
@@ -376,7 +436,6 @@ const MapComponent = ({ properties, center, zoom }) => {
 const MapPage = () => {
   const { owned, leases, loading, error } = useData();
   const [propertyTypeFilter, setPropertyTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   
   const PROPERTIES_PER_PAGE = 200; // Limit markers for performance
@@ -439,12 +498,9 @@ const MapPage = () => {
       if (propertyTypeFilter !== 'all' && property.type !== propertyTypeFilter) {
         return false;
       }
-      if (statusFilter !== 'all' && property.status !== statusFilter) {
-        return false;
-      }
       return true;
     });
-  }, [allProperties, propertyTypeFilter, statusFilter]);
+  }, [allProperties, propertyTypeFilter]);
 
   // Paginate properties for performance
   const paginatedProperties = useMemo(() => {
@@ -462,22 +518,6 @@ const MapPage = () => {
     setPropertyTypeFilter(event.target.value);
     setCurrentPage(1); // Reset to first page when filter changes
   };
-
-  const handleStatusFilterChange = (event) => {
-    setStatusFilter(event.target.value);
-    setCurrentPage(1); // Reset to first page when filter changes
-  };
-
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const owned = filteredProperties.filter(p => p.type === 'Owned').length;
-    const leased = filteredProperties.filter(p => p.type === 'Leased').length;
-    return {
-      total: filteredProperties.length,
-      owned,
-      leased,
-    };
-  }, [filteredProperties]);
 
   // Map center (continental US)
   const center = useMemo(() => {

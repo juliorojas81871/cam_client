@@ -1,0 +1,154 @@
+name: CI/CD Pipeline - Frontend
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+      env:
+        NPM_CONFIG_AUDIT: false
+        NPM_CONFIG_FUND: false
+
+    - name: Run linting (if available)
+      run: npm run lint 2>/dev/null || echo "No lint script found, skipping..."
+      continue-on-error: true
+
+    - name: Run TypeScript type checking
+      run: npx tsc --noEmit
+      continue-on-error: false
+
+    - name: Run Jest tests
+      run: npm test
+      env:
+        CI: true
+
+    - name: Run Jest tests with coverage
+      run: npm run test:coverage
+      env:
+        CI: true
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-frontend
+      continue-on-error: true
+
+    - name: Test build process
+      run: npm run build
+      env:
+        CI: true
+        GENERATE_SOURCEMAP: false
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: package-lock.json
+
+    - name: Install dependencies
+      run: npm ci --only=production
+      env:
+        NPM_CONFIG_AUDIT: false
+        NPM_CONFIG_FUND: false
+
+    - name: Build application
+      run: npm run build
+      env:
+        CI: true
+        GENERATE_SOURCEMAP: false
+
+    - name: Create deployment artifact
+      run: |
+        tar -czf frontend-build.tar.gz \
+          --exclude=node_modules \
+          --exclude=.git \
+          --exclude=.github \
+          --exclude=src \
+          --exclude=public \
+          --exclude=coverage \
+          --exclude=*.log \
+          --exclude=*.tmp \
+          --exclude=.npm \
+          --exclude=.cache \
+          build/ package.json
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: cam-frontend-${{ github.sha }}
+        path: frontend-build.tar.gz
+        retention-days: 30
+
+    - name: Upload build directory for static hosting
+      uses: actions/upload-artifact@v4
+      with:
+        name: cam-frontend-static-${{ github.sha }}
+        path: build/
+        retention-days: 30
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: cam-frontend-${{ github.sha }}
+
+    - name: Download static build
+      uses: actions/download-artifact@v4
+      with:
+        name: cam-frontend-static-${{ github.sha }}
+        path: build-static
+
+    - name: Deploy notification
+      run: |
+        echo "🚀 Frontend deployment artifacts ready:"
+        echo "📦 cam-frontend-${{ github.sha }} - Complete build with package.json"
+        echo "📁 cam-frontend-static-${{ github.sha }} - Static files only"
+        echo ""
+        echo "🔧 Deployment options:"
+        echo "  Option 1 - Static hosting (Netlify/Vercel/S3):"
+        echo "    • Use the static build artifact"
+        echo "    • Upload contents of build/ directory"
+        echo ""
+        echo "  Option 2 - Server hosting:"
+        echo "    • Use the complete build artifact"
+        echo "    • Extract: tar -xzf frontend-build.tar.gz"
+        echo "    • Serve build/ directory with a static file server"
+        echo "    • Example: npx serve -s build -l 3000"
+        echo ""
+        echo "✅ Build completed successfully!" 

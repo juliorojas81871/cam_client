@@ -84,14 +84,11 @@ const LeasedPropertiesPage = () => {
   const { leases, loading, error } = useData();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [hoveredLease, setHoveredLease] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
 
   // Filter and process lease data
   const processedLeases = useMemo(() => {
     
-    // First, let's see what we have without filtering
-    const beforeFilter = leases.length;
     
     const filtered = leases.filter(lease => {
       // More flexible filtering - check for any lease identifier and dates
@@ -289,7 +286,6 @@ const LeasedPropertiesPage = () => {
       <ResponsiveContainer width="100%" height={400}>
         <ScatterChart
           margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-          onMouseLeave={() => setHoveredLease(null)}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
@@ -369,8 +365,7 @@ const LeasedPropertiesPage = () => {
                   stroke={color}
                   strokeWidth={0.5}
                   opacity={0.8}
-                  onMouseEnter={() => setHoveredLease(payload.lease)}
-                />
+               />
               );
             }}
           />

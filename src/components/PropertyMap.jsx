@@ -243,7 +243,7 @@ const MapComponent = ({ properties, center, zoom }) => {
 
       markersRef.current = newMarkers;
     }
-  }, [map, properties, infoWindow]);
+  }, [map, properties, infoWindow, showInfoWindow, hideInfoWindow]);
 
   // Cleanup on unmount
   useEffect(() => {
