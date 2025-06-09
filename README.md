@@ -62,10 +62,11 @@ Make sure your CAM Database Server is running and accessible at the URLs specifi
 
 The application includes comprehensive testing with Jest and React Testing Library:
 
-```bash
 # Run all tests
 npm test
 
 # Run tests with coverage report
 npm run test:coverage
 
+## Example Pic:
+![Notes Example Pic](https://raw.githubusercontent.com/juliorojas81871/cam_server/main/public/main.png)
