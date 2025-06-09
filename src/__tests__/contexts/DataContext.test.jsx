@@ -55,8 +55,8 @@ describe('DataContext', () => {
       expect(screen.getByText('Leases: 2')).toBeInTheDocument();
     });
 
-    expect(global.fetch).toHaveBeenCalledWith('http://localhost:3001/api/owned');
-    expect(global.fetch).toHaveBeenCalledWith('http://localhost:3001/api/leases');
+    expect(global.fetch).toHaveBeenCalledWith(process.env.REACT_APP_OWNED_API_URL);
+    expect(global.fetch).toHaveBeenCalledWith(process.env.REACT_APP_LEASES_API_URL);
   });
 
   test('handles fetch errors', async () => {
