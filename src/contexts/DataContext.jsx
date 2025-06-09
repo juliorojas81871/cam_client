@@ -22,8 +22,8 @@ export const DataProvider = ({ children }) => {
       setError(null);
 
       const [ownedResponse, leasesResponse] = await Promise.all([
-        fetch('http://localhost:3001/api/owned'),
-        fetch('http://localhost:3001/api/leases')
+        fetch(process.env.REACT_APP_OWNED_API_URL),
+        fetch(process.env.REACT_APP_LEASES_API_URL)
       ]);
 
       if (!ownedResponse.ok || !leasesResponse.ok) {
